@@ -159,6 +159,29 @@ async function fetchApiSocialAccounts(fallbackGroupId) {
   }
 }
 
+async function fetchApiProfileAccountLinks() {
+  try {
+    const response = await apiFetch("/api/social-accounts/profile-accounts", {
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || "Nao foi possivel carregar os vinculos dos perfis.");
+    }
+
+    const payload = await response.json();
+    if (!payload.success || !Array.isArray(payload.links)) {
+      return [];
+    }
+
+    return payload.links;
+  } catch (error) {
+    console.warn("Falha ao carregar vinculos de contas dos perfis:", error);
+    return [];
+  }
+}
+
 async function fetchSocialData() {
   const { data: groupsData, error: groupsError } = await supabase
     .from("social_groups")
@@ -179,12 +202,16 @@ async function fetchSocialData() {
   }
 
   const mergedGroups = mergeById(groupsData || [], readLocalItems(LOCAL_GROUPS_KEY));
-  const apiAccountsData = await fetchApiSocialAccounts(mergedGroups[0]?.id || 1);
+  const [apiAccountsData, profileAccountLinksData] = await Promise.all([
+    fetchApiSocialAccounts(mergedGroups[0]?.id || 1),
+    fetchApiProfileAccountLinks(),
+  ]);
 
   return {
     groupsData: mergedGroups,
     profilesData: mergeById(profilesData || [], readLocalItems(LOCAL_PROFILES_KEY)),
     accountsData: mergeById(apiAccountsData, readLocalItems(LOCAL_ACCOUNTS_KEY)),
+    profileAccountLinksData,
   };
 }
 
@@ -193,10 +220,12 @@ export default function SocialAccounts() {
   const [groups, setGroups] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [profileAccountLinks, setProfileAccountLinks] = useState([]);
 
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [addTikTokModal, setAddTikTokModal] = useState(null);
+  const [chooseTikTokModal, setChooseTikTokModal] = useState(null);
   const [showChromeTip, setShowChromeTip] = useState(false);
 
   const [groupName, setGroupName] = useState("");
@@ -206,10 +235,11 @@ export default function SocialAccounts() {
   const [profileDescription, setProfileDescription] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState("");
 
-  const applyLoadedData = useCallback(({ groupsData, profilesData, accountsData }) => {
+  const applyLoadedData = useCallback(({ groupsData, profilesData, accountsData, profileAccountLinksData }) => {
     setGroups(groupsData);
     setProfiles(profilesData);
     setAccounts(accountsData);
+    setProfileAccountLinks(profileAccountLinksData || []);
     setSelectedGroupId((currentGroupId) =>
       groupsData.some((group) => String(group.id) === String(currentGroupId))
         ? currentGroupId
@@ -433,6 +463,15 @@ export default function SocialAccounts() {
     connectTikTok({ groupId, profileId });
   }
 
+  function openChooseTikTokModal(groupId, profileId) {
+    if (isLocalId(profileId)) {
+      alert("Este perfil ainda esta salvo apenas neste navegador. Salve o perfil no Supabase antes de vincular uma conta TikTok.");
+      return;
+    }
+
+    setChooseTikTokModal({ groupId: isLocalId(groupId) ? null : groupId, profileId });
+  }
+
   function openAddAnotherTikTokModal(groupId, profileId = null) {
     setShowChromeTip(false);
     setAddTikTokModal({ groupId, profileId });
@@ -455,13 +494,75 @@ export default function SocialAccounts() {
   }
 
   function continueAddAnotherTikTok() {
-    const context = addTikTokModal || {};
+    const context = addTikTokModal || chooseTikTokModal || {};
     setAddTikTokModal(null);
     connectTikTok({
       groupId: context.groupId,
       profileId: context.profileId,
       mode: "add_another",
     });
+  }
+
+  function openAddTikTokFromChooser() {
+    if (!chooseTikTokModal) return;
+
+    openAddAnotherTikTokModal(chooseTikTokModal.groupId, chooseTikTokModal.profileId);
+    setChooseTikTokModal(null);
+  }
+
+  async function linkTikTokToProfile(account) {
+    if (!chooseTikTokModal) return;
+
+    try {
+      const response = await apiFetch("/api/social-accounts/profile-accounts", {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({
+          group_id: chooseTikTokModal.groupId,
+          profile_id: chooseTikTokModal.profileId,
+          social_account_id: account.social_account_id || account.id,
+          provider: "tiktok",
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.message || "Nao foi possivel usar esta conta TikTok no perfil.");
+      }
+
+      setChooseTikTokModal(null);
+      await loadData();
+    } catch (error) {
+      console.warn("Falha ao vincular TikTok ao perfil:", error);
+      alert(error instanceof Error ? error.message : "Nao foi possivel usar esta conta TikTok no perfil.");
+    }
+  }
+
+  async function unlinkTikTokFromProfile(account) {
+    const confirmRemove = window.confirm("Remover esta conta TikTok deste perfil?");
+    if (!confirmRemove) return;
+
+    try {
+      const response = await apiFetch("/api/social-accounts/profile-accounts", {
+        method: "DELETE",
+        credentials: "include",
+        body: JSON.stringify({
+          id: account.profile_account_link_id,
+          profile_id: account.profile_id,
+          social_account_id: account.social_account_id,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.message || "Nao foi possivel remover a conta TikTok deste perfil.");
+      }
+
+      await loadData();
+    } catch (error) {
+      console.warn("Falha ao remover vinculo TikTok:", error);
+      alert(error instanceof Error ? error.message : "Nao foi possivel remover a conta TikTok deste perfil.");
+    }
   }
 
   function prepareTikTokGroupUse(account) {
@@ -496,6 +597,19 @@ export default function SocialAccounts() {
     }
 
     await loadData();
+  }
+
+  function getLinkedProfileAccounts(profileId) {
+    return profileAccountLinks
+      .filter((link) => String(link.profile_id) === String(profileId) && link.account)
+      .map((link) => ({
+        ...normalizeApiAccount(link.account, link.group_id),
+        id: `profile-link-${link.id}`,
+        profile_account_link_id: link.id,
+        social_account_id: link.social_account_id,
+        group_id: link.group_id,
+        profile_id: link.profile_id,
+      }));
   }
 
   function renderTikTokAccountCard(account, index) {
@@ -585,9 +699,16 @@ export default function SocialAccounts() {
               Reconectar
             </button>
 
-            <button className="danger" onClick={() => disconnectTikTokAccount(account)}>
+            <button
+              className="danger"
+              onClick={() =>
+                account.profile_account_link_id
+                  ? unlinkTikTokFromProfile(account)
+                  : disconnectTikTokAccount(account)
+              }
+            >
               <Trash2 size={13} />
-              Desconectar
+              {account.profile_account_link_id ? "Remover do perfil" : "Desconectar"}
             </button>
           </div>
         )}
@@ -599,9 +720,16 @@ export default function SocialAccounts() {
               Reconectar
             </button>
 
-            <button className="danger" onClick={() => disconnectTikTokAccount(account)}>
+            <button
+              className="danger"
+              onClick={() =>
+                account.profile_account_link_id
+                  ? unlinkTikTokFromProfile(account)
+                  : disconnectTikTokAccount(account)
+              }
+            >
               <Trash2 size={13} />
-              Desconectar
+              {account.profile_account_link_id ? "Remover do perfil" : "Desconectar"}
             </button>
           </div>
         )}
@@ -752,9 +880,10 @@ export default function SocialAccounts() {
                 ) : (
                   <div className="profiles-grid">
                     {groupProfiles.map((profile) => {
-                      const profileAccounts = accounts.filter(
-                        (account) => String(account.profile_id) === String(profile.id),
-                      );
+                      const profileAccounts = [
+                        ...accounts.filter((account) => String(account.profile_id) === String(profile.id)),
+                        ...getLinkedProfileAccounts(profile.id),
+                      ];
 
                       return (
                         <div className="profile-card" key={profile.id}>
@@ -800,7 +929,7 @@ export default function SocialAccounts() {
                                 Instagram
                               </button>
 
-                              <button onClick={() => connectGroupTikTok(group.id, profile.id)}>
+                              <button onClick={() => openChooseTikTokModal(group.id, profile.id)}>
                                 <Plus size={14} />
                                 TikTok
                               </button>
@@ -916,6 +1045,85 @@ export default function SocialAccounts() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {chooseTikTokModal && (
+        <div className="modal-bg">
+          <div className="social-modal">
+            <div className="modal-top">
+              <div>
+                <h2>Escolher conta TikTok para este perfil</h2>
+                <p>
+                  Use uma conta TikTok ja salva no SpeedFlow. Esta acao apenas vincula a conta ao
+                  perfil, sem abrir OAuth ou reconectar no TikTok.
+                </p>
+              </div>
+
+              <button onClick={() => setChooseTikTokModal(null)}>x</button>
+            </div>
+
+            {tiktokAccounts.length === 0 ? (
+              <div className="tiktok-empty-state">
+                <Music2 size={18} />
+                <span>Nenhuma conta TikTok salva ainda.</span>
+              </div>
+            ) : (
+              <div className="tiktok-accounts-grid">
+                {tiktokAccounts.map((account) => {
+                  const displayName = account.display_name || account.username || "Perfil TikTok";
+                  const alreadyLinked = profileAccountLinks.some(
+                    (link) =>
+                      String(link.profile_id) === String(chooseTikTokModal.profileId) &&
+                      String(link.social_account_id) === String(account.social_account_id || account.id),
+                  );
+
+                  return (
+                    <div className="tiktok-account-card" key={`chooser-${account.id || account.account_id}`}>
+                      <div className="tiktok-account-main">
+                        {account.avatar_url ? (
+                          <img src={account.avatar_url} alt={displayName} />
+                        ) : (
+                          <div className="tiktok-account-fallback">
+                            <Music2 size={18} />
+                          </div>
+                        )}
+
+                        <div className="tiktok-account-info">
+                          <div className="tiktok-account-title">
+                            <strong>{displayName}</strong>
+                            <span>{isDisconnected(account) ? "disconnected" : "connected"}</span>
+                          </div>
+                          <small>{account.platform || account.provider || "TikTok Business"}</small>
+                          <code>{maskAccountId(account.account_id || account.provider_user_id)}</code>
+                        </div>
+                      </div>
+
+                      <div className="connected-account-actions">
+                        <button
+                          className="save-button"
+                          disabled={alreadyLinked || isDisconnected(account)}
+                          onClick={() => linkTikTokToProfile(account)}
+                        >
+                          {alreadyLinked ? "Ja esta neste perfil" : "Usar neste perfil"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="modal-buttons">
+              <button type="button" className="save-button" onClick={openAddTikTokFromChooser}>
+                {tiktokAccounts.length === 0 ? "Adicionar nova conta TikTok" : "Adicionar outra conta TikTok"}
+              </button>
+
+              <button type="button" className="cancel-button" onClick={() => setChooseTikTokModal(null)}>
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

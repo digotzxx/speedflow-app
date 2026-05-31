@@ -342,8 +342,8 @@ export async function handleTikTokOAuthCallback(req, res) {
 
     const title = profileId
       ? wasExisting
-        ? "Essa conta TikTok ja estava salva e foi vinculada a este perfil"
-        : "Nova conta TikTok conectada e vinculada ao perfil com sucesso"
+        ? "Conta TikTok vinculada ao perfil"
+        : "Conta TikTok conectada ao perfil"
       : wasExisting
       ? "Essa conta TikTok ja estava conectada"
       : "Nova conta TikTok conectada com sucesso";

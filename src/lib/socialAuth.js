@@ -134,8 +134,9 @@ export async function connectTikTok(context = {}) {
     return;
   }
 
-  const authWindow = context.openInNewWindow
-    ? window.open("about:blank", "_blank", "width=520,height=720")
+  const shouldOpenPopup = context.openInPopup || context.openInNewWindow;
+  const authWindow = shouldOpenPopup
+    ? window.open("about:blank", "tiktok_oauth", "width=520,height=760,noopener,noreferrer")
     : null;
 
   if (authWindow) {

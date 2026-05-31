@@ -15,7 +15,6 @@ import { apiFetch } from "../lib/apiClient";
 import {
   connectInstagram,
   connectTikTok,
-  getTikTokAddAnotherStartUrl,
   startTikTokAuth,
 } from "../lib/socialAuth";
 
@@ -91,29 +90,6 @@ function maskAccountId(accountId) {
   if (value.length <= 10) return value;
 
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
-}
-
-function formatDate(value) {
-  if (!value) return "Data nao informada";
-
-  try {
-    return new Date(value).toLocaleDateString("pt-BR");
-  } catch {
-    return "Data nao informada";
-  }
-}
-
-function getTokenStatus(account) {
-  if (!account.expires_at) return "Token ativo";
-
-  const expiresAt = new Date(account.expires_at).getTime();
-  if (Number.isNaN(expiresAt)) return "Token ativo";
-
-  const days = Math.ceil((expiresAt - Date.now()) / 86_400_000);
-  if (days < 0) return "Token expirado";
-  if (days === 0) return "Token expira hoje";
-
-  return `Token expira em ${days} dia${days === 1 ? "" : "s"}`;
 }
 
 function normalizeApiAccount(account, fallbackGroupId) {
@@ -229,9 +205,7 @@ export default function SocialAccounts() {
 
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [addTikTokModal, setAddTikTokModal] = useState(null);
   const [chooseTikTokModal, setChooseTikTokModal] = useState(null);
-  const [showChromeTip, setShowChromeTip] = useState(false);
 
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
@@ -468,44 +442,20 @@ export default function SocialAccounts() {
     connectTikTok({ groupId, profileId });
   }
 
-  function openChooseTikTokModal(groupId, profileId) {
+  function openChooseTikTokModal(groupId, profile) {
+    const profileId = typeof profile === "object" ? profile.id : profile;
+    const profileName = typeof profile === "object" ? profile.name : "";
+
     if (isLocalId(profileId)) {
       alert("Este perfil ainda esta salvo apenas neste navegador. Salve o perfil no Supabase antes de vincular uma conta TikTok.");
       return;
     }
 
-    setChooseTikTokModal({ groupId: isLocalId(groupId) ? null : groupId, profileId });
-  }
-
-  function openAddAnotherTikTokModal(groupId, profileId = null) {
-    setShowChromeTip(false);
-    setAddTikTokModal({ groupId, profileId });
+    setChooseTikTokModal({ groupId: isLocalId(groupId) ? null : groupId, profileId, profileName });
   }
 
   function openTikTokAccountSwitcher() {
     window.open("https://www.tiktok.com", "_blank", "noopener,noreferrer");
-  }
-
-  async function copyTikTokIncognitoLink() {
-    const link = getTikTokAddAnotherStartUrl();
-
-    try {
-      await navigator.clipboard.writeText(link);
-      alert("Link copiado. Abra uma janela anonima, cole o link e entre na outra conta TikTok.");
-    } catch (error) {
-      console.warn("Falha ao copiar link TikTok:", error);
-      window.prompt("Copie este link e abra em uma janela anonima:", link);
-    }
-  }
-
-  function continueAddAnotherTikTok() {
-    const context = addTikTokModal || chooseTikTokModal || {};
-    setAddTikTokModal(null);
-    connectTikTok({
-      groupId: context.groupId,
-      profileId: context.profileId,
-      mode: "add_another",
-    });
   }
 
   function openTikTokOAuthForProfile() {
@@ -517,7 +467,7 @@ export default function SocialAccounts() {
       mode: "add_another",
       groupId: context.groupId,
       profileId: context.profileId,
-      openInNewWindow: true,
+      openInPopup: true,
     });
   }
 
@@ -543,6 +493,7 @@ export default function SocialAccounts() {
 
       setChooseTikTokModal(null);
       await loadData();
+      alert("Conta TikTok vinculada ao perfil.");
     } catch (error) {
       console.warn("Falha ao vincular TikTok ao perfil:", error);
       alert(error instanceof Error ? error.message : "Nao foi possivel usar esta conta TikTok no perfil.");
@@ -574,13 +525,6 @@ export default function SocialAccounts() {
       console.warn("Falha ao remover vinculo TikTok:", error);
       alert(error instanceof Error ? error.message : "Nao foi possivel remover a conta TikTok deste perfil.");
     }
-  }
-
-  function prepareTikTokGroupUse(account) {
-    const displayName = account.display_name || account.username || "Conta TikTok";
-    alert(
-      `A conta ${displayName} ja esta salva no SpeedFlow. A associacao direta a grupos sera habilitada quando o vinculo persistente de contas e grupos estiver disponivel.`,
-    );
   }
 
   async function addProfileSlot(groupId) {
@@ -621,58 +565,6 @@ export default function SocialAccounts() {
         group_id: link.group_id,
         profile_id: link.profile_id,
       }));
-  }
-
-  function renderTikTokAccountCard(account, index) {
-    const displayName = account.display_name || account.username || "Perfil TikTok";
-    const disconnected = isDisconnected(account);
-    const connectedStatus = disconnected ? "Desconectada" : "Conta conectada";
-
-    return (
-      <div className="tiktok-account-card" key={account.id || account.account_id}>
-        <div className="tiktok-account-main">
-          {account.avatar_url ? (
-            <img src={account.avatar_url} alt={displayName} />
-          ) : (
-            <div className="tiktok-account-fallback">
-              <Music2 size={18} />
-            </div>
-          )}
-
-          <div className="tiktok-account-info">
-            <div className="tiktok-account-title">
-              <strong>{displayName}</strong>
-              {index === 0 && <span>Conta principal</span>}
-            </div>
-            <small>{account.platform || account.provider || "TikTok Business"}</small>
-            <code>{maskAccountId(account.account_id || account.provider_user_id)}</code>
-          </div>
-        </div>
-
-        <div className="tiktok-account-meta">
-          <span className={disconnected ? "status-off" : "status-on"}>{connectedStatus}</span>
-          <span>Conectada em {formatDate(account.connected_at_iso || account.connected_at)}</span>
-          <span>{getTokenStatus(account)}</span>
-        </div>
-
-        <div className="connected-account-actions">
-          <button onClick={() => connectGroupTikTok(account.group_id || defaultTikTokGroupId, account.profile_id)}>
-            <RefreshCw size={13} />
-            Reconectar
-          </button>
-
-          <button onClick={() => prepareTikTokGroupUse(account)}>
-            <Folder size={13} />
-            Usar em grupo
-          </button>
-
-          <button className="danger" onClick={() => disconnectTikTokAccount(account)}>
-            <Trash2 size={13} />
-            Desconectar
-          </button>
-        </div>
-      </div>
-    );
   }
 
   function renderConnectedAccount(account, groupId, profileId = null) {
@@ -752,8 +644,6 @@ export default function SocialAccounts() {
   const totalGroups = groups.length;
   const totalAccounts = accounts.length;
   const tiktokAccounts = accounts.filter(isTikTokAccount);
-  const connectedTikTokAccounts = tiktokAccounts.filter((account) => !isDisconnected(account));
-  const defaultTikTokGroupId = selectedGroupId || groups[0]?.id || 1;
 
   return (
     <div className="channels-page">
@@ -796,44 +686,6 @@ export default function SocialAccounts() {
           <span>Contas conectadas</span>
         </div>
       </div>
-
-      <section className="tiktok-accounts-section">
-        <div className="tiktok-section-header">
-          <div>
-            <h2>Contas TikTok conectadas</h2>
-            <p>
-              {connectedTikTokAccounts.length} conta{connectedTikTokAccounts.length === 1 ? "" : "s"} TikTok
-              conectada{connectedTikTokAccounts.length === 1 ? "" : "s"}
-            </p>
-          </div>
-
-          <button className="primary-action" onClick={() => openAddAnotherTikTokModal(defaultTikTokGroupId)}>
-            <Plus size={16} />
-            Adicionar nova conta TikTok
-          </button>
-        </div>
-
-        <div className="tiktok-howto-box">
-          <strong>Melhor forma de conectar várias contas</strong>
-          <p>
-            Para conectar várias contas TikTok, repita este processo para cada perfil: clique em Adicionar
-            nova conta TikTok, copie o link, abra uma janela anônima ou outro perfil do Chrome, cole o link,
-            faça login no SpeedFlow, entre no TikTok com a conta desejada, autorize e volte para Contas
-            Sociais para conferir se apareceu um novo card.
-          </p>
-        </div>
-
-        {tiktokAccounts.length === 0 ? (
-          <div className="tiktok-empty-state">
-            <Music2 size={18} />
-            <span>Nenhuma conta TikTok salva ainda.</span>
-          </div>
-        ) : (
-          <div className="tiktok-accounts-grid">
-            {tiktokAccounts.map((account, index) => renderTikTokAccountCard(account, index))}
-          </div>
-        )}
-      </section>
 
       <div className="channels-section-title">
         <span>CANAIS SOCIAIS</span>
@@ -940,7 +792,7 @@ export default function SocialAccounts() {
                                 Instagram
                               </button>
 
-                              <button onClick={() => openChooseTikTokModal(group.id, profile.id)}>
+                              <button onClick={() => openChooseTikTokModal(group.id, profile)}>
                                 <Plus size={14} />
                                 TikTok
                               </button>
@@ -1065,10 +917,12 @@ export default function SocialAccounts() {
           <div className="social-modal">
             <div className="modal-top">
               <div>
-                <h2>Adicionar TikTok ao perfil</h2>
+                <h2>Conectar TikTok ao perfil</h2>
+                <p>Perfil selecionado: {chooseTikTokModal.profileName || "Perfil selecionado"}</p>
                 <p>
-                  Escolha uma conta ja salva ou abra a autorizacao oficial do TikTok para conectar
-                  outra conta.
+                  Voce pode conectar uma nova conta TikTok ou usar uma conta TikTok que ja esta
+                  salva no SpeedFlow. Se voce conectar uma nova conta, ela sera salva e vinculada
+                  automaticamente a este perfil.
                 </p>
               </div>
 
@@ -1076,18 +930,45 @@ export default function SocialAccounts() {
             </div>
 
             <div className="tiktok-modal-tip">
-              <strong>Usar conta ja salva</strong>
+              <strong>Conectar nova conta TikTok</strong>
+              <p>
+                Vamos abrir a tela oficial do TikTok para voce autorizar a conta. Se o TikTok usar
+                automaticamente uma conta ja logada, saia ou troque de conta no TikTok antes de
+                autorizar.
+              </p>
+            </div>
+
+            <div className="modal-buttons">
+              <button type="button" className="save-button" onClick={openTikTokOAuthForProfile}>
+                Abrir conexao TikTok
+              </button>
+
+              <button type="button" className="cancel-button" onClick={openTikTokAccountSwitcher}>
+                Abrir TikTok para trocar/sair da conta
+              </button>
+
+              <button type="button" className="cancel-button" onClick={() => setChooseTikTokModal(null)}>
+                Cancelar
+              </button>
+            </div>
+
+            <div className="tiktok-modal-tip">
+              <strong>Usar conta TikTok ja salva</strong>
             </div>
 
             {tiktokAccounts.length === 0 ? (
               <div className="tiktok-empty-state">
                 <Music2 size={18} />
-                <span>Nenhuma conta TikTok salva ainda.</span>
+                <span>
+                  Nenhuma conta TikTok salva ainda. Clique em Abrir conexao TikTok para conectar sua
+                  primeira conta.
+                </span>
               </div>
             ) : (
               <div className="tiktok-accounts-grid">
                 {tiktokAccounts.map((account) => {
                   const displayName = account.display_name || account.username || "Perfil TikTok";
+                  const disconnected = isDisconnected(account);
                   const alreadyLinked = profileAccountLinks.some(
                     (link) =>
                       String(link.profile_id) === String(chooseTikTokModal.profileId) &&
@@ -1108,17 +989,17 @@ export default function SocialAccounts() {
                         <div className="tiktok-account-info">
                           <div className="tiktok-account-title">
                             <strong>{displayName}</strong>
-                            <span>{isDisconnected(account) ? "disconnected" : "connected"}</span>
+                            <span>{disconnected ? "disconnected" : "connected"}</span>
                           </div>
-                          <small>{account.platform || account.provider || "TikTok Business"}</small>
-                          <code>{maskAccountId(account.account_id || account.provider_user_id)}</code>
+                          <small>TikTok ID: {maskAccountId(account.account_id || account.provider_user_id)}</small>
+                          <code>{account.platform || account.provider || "TikTok Business"}</code>
                         </div>
                       </div>
 
                       <div className="connected-account-actions">
                         <button
-                          className="save-button"
-                          disabled={alreadyLinked || isDisconnected(account)}
+                          className="cancel-button"
+                          disabled={alreadyLinked || disconnected}
                           onClick={() => linkTikTokToProfile(account)}
                         >
                           {alreadyLinked ? "Ja esta neste perfil" : "Usar esta conta neste perfil"}
@@ -1128,81 +1009,6 @@ export default function SocialAccounts() {
                   );
                 })}
               </div>
-            )}
-
-            <div className="tiktok-modal-tip">
-              <strong>Conectar nova conta TikTok</strong>
-              <p>
-                Para conectar uma conta diferente, vamos abrir a tela oficial do TikTok. Se o TikTok
-                entrar automaticamente na mesma conta, saia/troque de conta no TikTok e tente novamente.
-              </p>
-              <p>
-                Para garantir outra conta, abra o TikTok, saia da conta atual ou troque de perfil,
-                depois clique em Abrir conexao TikTok.
-              </p>
-            </div>
-
-            <div className="modal-buttons">
-              <button type="button" className="save-button" onClick={openTikTokOAuthForProfile}>
-                Abrir conexao TikTok
-              </button>
-
-              <button type="button" className="cancel-button" onClick={openTikTokAccountSwitcher}>
-                Abrir TikTok para trocar/sair da conta
-              </button>
-
-              <button type="button" className="cancel-button" onClick={() => setChooseTikTokModal(null)}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {addTikTokModal && (
-        <div className="modal-bg">
-          <div className="social-modal">
-            <div className="modal-top">
-              <div>
-                <h2>Adicionar nova conta TikTok</h2>
-                <p>
-                  Para adicionar outra conta TikTok, voce precisa autorizar um perfil diferente. O TikTok
-                  pode usar automaticamente a conta ja logada neste navegador. A forma mais segura e abrir
-                  o link em uma janela anonima ou em outro perfil do Chrome.
-                </p>
-              </div>
-
-              <button onClick={() => setAddTikTokModal(null)}>x</button>
-            </div>
-
-            <p className="tiktok-modal-tip">
-              Melhor opcao: copie o link, abra uma janela anonima, cole o link e entre na outra conta
-              TikTok.
-            </p>
-
-            <div className="modal-buttons">
-              <button type="button" className="cancel-button" onClick={copyTikTokIncognitoLink}>
-                Copiar link para janela anonima
-              </button>
-
-              <button type="button" className="cancel-button" onClick={openTikTokAccountSwitcher}>
-                Abrir TikTok para sair/trocar conta
-              </button>
-
-              <button type="button" className="save-button" onClick={continueAddAnotherTikTok}>
-                Continuar neste navegador
-              </button>
-
-              <button type="button" className="cancel-button" onClick={() => setShowChromeTip(true)}>
-                Como usar varios perfis no Chrome
-              </button>
-            </div>
-
-            {showChromeTip && (
-              <p className="tiktok-modal-tip">
-                Crie outro perfil no Chrome, entre em outra conta TikTok nesse perfil e abra o link
-                copiado.
-              </p>
             )}
           </div>
         </div>

@@ -2484,22 +2484,35 @@ button {
   margin-bottom: 18px;
 }
 
-.tiktok-global-section {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 26px;
-  padding: 16px;
+.tiktok-accounts-section {
+  margin-bottom: 28px;
+  padding: 18px;
   border-radius: 14px;
   background: #14141d;
   border: 1px solid rgba(139, 92, 246, 0.22);
 }
 
-.tiktok-global-section .channels-subtitle {
-  margin-bottom: 0;
+.tiktok-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
 }
 
+.tiktok-section-header h2 {
+  margin: 0 0 6px;
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.tiktok-section-header p {
+  margin: 0;
+  color: #8f9bb3;
+  font-size: 13px;
+}
+
+.tiktok-howto-box,
 .tiktok-modal-tip {
   margin: 0 0 14px;
   padding: 12px;
@@ -2508,6 +2521,116 @@ button {
   color: #ddd6fe;
   font-size: 13px;
   line-height: 1.45;
+}
+
+.tiktok-howto-box strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #ffffff;
+}
+
+.tiktok-howto-box p {
+  margin: 0;
+}
+
+.tiktok-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.tiktok-accounts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.tiktok-account-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tiktok-account-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tiktok-account-main img,
+.tiktok-account-fallback {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.tiktok-account-main img {
+  object-fit: cover;
+}
+
+.tiktok-account-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(139, 92, 246, 0.18);
+  color: #a78bfa;
+}
+
+.tiktok-account-info {
+  min-width: 0;
+}
+
+.tiktok-account-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tiktok-account-title strong {
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.tiktok-account-title span {
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.13);
+  color: #86efac;
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.tiktok-account-info small,
+.tiktok-account-info code,
+.tiktok-account-meta span {
+  display: block;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.tiktok-account-info code {
+  margin-top: 3px;
+  color: #c4b5fd;
+}
+
+.tiktok-account-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.tiktok-account-meta .status-on {
+  color: #86efac;
+}
+
+.tiktok-account-meta .status-off {
+  color: #fb7185;
 }
 
 .social-modal .modal-buttons {
@@ -3154,7 +3277,7 @@ button {
     justify-content: flex-start;
   }
 
-  .tiktok-global-section {
+  .tiktok-section-header {
     align-items: stretch;
     flex-direction: column;
   }

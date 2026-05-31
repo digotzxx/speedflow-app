@@ -137,6 +137,7 @@ export async function saveConnectedAccount(userId, account) {
   return {
     ...sanitizeAccount(data),
     was_existing: wasExisting,
+    action: wasExisting ? "updated" : "created",
   };
 }
 

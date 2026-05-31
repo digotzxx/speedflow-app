@@ -302,14 +302,23 @@ export async function handleTikTokOAuthCallback(req, res) {
 
     step = "salvar conta TikTok no Supabase";
     const publicAccount = await saveConnectedAccount(userSession.id, account);
-    const message = publicAccount.was_existing
-      ? "Essa mesma conta TikTok ja estava conectada. Para adicionar outro perfil, saia dessa conta no TikTok ou use uma janela anonima."
-      : "Novo perfil TikTok conectado com sucesso.";
+    const wasExisting = publicAccount.action === "updated";
+    const title = wasExisting
+      ? "Essa conta TikTok ja estava conectada"
+      : "Nova conta TikTok conectada com sucesso";
+    const message = wasExisting
+      ? "O TikTok retornou o mesmo perfil ja salvo. Para adicionar outra conta, use janela anonima, outro navegador ou outro perfil do Chrome."
+      : "Esse perfil foi salvo como uma nova conta TikTok no SpeedFlow.";
 
     sendJson(res, 200, {
       success: true,
+      action: publicAccount.action,
+      status: wasExisting ? "reconnected" : "new_connected",
+      title,
       message,
-      was_existing: publicAccount.was_existing,
+      account_id: publicAccount.account_id,
+      provider: "tiktok",
+      was_existing: wasExisting,
       account: publicAccount,
     });
   } catch (error) {

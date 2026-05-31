@@ -197,18 +197,20 @@ export default function TikTokCallback() {
         writeLocalList(LOCAL_GROUPS_KEY, groups);
         writeLocalList(LOCAL_ACCOUNTS_KEY, [account, ...accountsWithoutDuplicate]);
 
-        const successMessage = payload.was_existing
-          ? payload.message ||
-            "Essa mesma conta TikTok ja estava conectada. Para adicionar outro perfil, saia dessa conta no TikTok ou use uma janela anonima."
-          : "Novo perfil TikTok conectado com sucesso.";
-
-        setStatus(successMessage);
-        setMessage(
-          oauthMode === "add_another"
-            ? `${successMessage} Redirecionando para Contas Sociais...`
-            : `${successMessage} Redirecionando para Contas Sociais...`,
+        const successTitle = payload.title || (
+          payload.action === "updated"
+            ? "Essa conta TikTok ja estava conectada"
+            : "Nova conta TikTok conectada com sucesso"
         );
-        redirectToSocialAccounts(navigate, 1200);
+        const successMessage = payload.message || (
+          payload.action === "updated"
+            ? "O TikTok retornou o mesmo perfil ja salvo. Para adicionar outra conta, use janela anonima, outro navegador ou outro perfil do Chrome."
+            : "Esse perfil foi salvo como uma nova conta TikTok no SpeedFlow."
+        );
+
+        setStatus(successTitle);
+        setMessage(`${successMessage} Redirecionando para Contas Sociais...`);
+        redirectToSocialAccounts(navigate, oauthMode === "add_another" ? 2200 : 1500);
       } catch (callbackError) {
         console.error("TikTok callback error:", callbackError);
         setStatus("Falha na conexao com TikTok");

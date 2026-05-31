@@ -13,6 +13,10 @@
       "destination": "/privacy.html"
     },
     {
+      "source": "/terms.html/tiktokNzuROVg7xPbbKjTMr9t6KvLt77MS6F5w.txt",
+      "destination": "/tiktokNzuROVg7xPbbKjTMr9t6KvLt77MS6F5w.txt"
+    },
+    {
       "source": "/auth/callback/tiktok",
       "destination": "/index.html"
     },

@@ -5,6 +5,14 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/terms.html/",
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/privacy.html/",
+      "destination": "/privacy.html"
+    },
+    {
       "source": "/auth/callback/tiktok",
       "destination": "/index.html"
     },

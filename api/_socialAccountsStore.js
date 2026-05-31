@@ -112,6 +112,104 @@ function buildAccountRow({ userId, account }) {
   };
 }
 
+function sanitizeGroup(group) {
+  return {
+    id: group.id,
+    user_id: group.user_id,
+    name: group.name,
+    description: group.description,
+    created_at: group.created_at,
+    updated_at: group.updated_at,
+  };
+}
+
+function sanitizeProfile(profile) {
+  return {
+    id: profile.id,
+    user_id: profile.user_id,
+    group_id: profile.group_id,
+    name: profile.name,
+    description: profile.description,
+    created_at: profile.created_at,
+    updated_at: profile.updated_at,
+  };
+}
+
+export async function saveSocialGroup(userId, { name, description = "" }) {
+  assertSupabaseConfigured();
+
+  const groupName = String(name || "").trim();
+  if (!groupName) {
+    throw new Error("Nome do grupo e obrigatorio.");
+  }
+
+  const now = new Date().toISOString();
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("social_groups")
+    .insert({
+      user_id: userId,
+      name: groupName,
+      description: String(description || "").trim() || "Grupo de perfis sociais",
+      updated_at: now,
+    })
+    .select("id,user_id,name,description,created_at,updated_at")
+    .single();
+
+  if (error) {
+    logSupabaseError("salvar grupo social", error);
+    throw new Error("Nao foi possivel salvar o grupo social.");
+  }
+
+  return sanitizeGroup(data);
+}
+
+export async function saveSocialProfile(userId, { groupId, name, description = "" }) {
+  assertSupabaseConfigured();
+
+  const profileName = String(name || "").trim();
+  if (!groupId || !profileName) {
+    throw new Error("Grupo e nome do perfil sao obrigatorios.");
+  }
+
+  const now = new Date().toISOString();
+  const supabase = getSupabaseAdmin();
+  const { data: group, error: groupError } = await supabase
+    .from("social_groups")
+    .select("id")
+    .eq("id", groupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (groupError) {
+    logSupabaseError("validar grupo do perfil", groupError);
+    throw new Error("Nao foi possivel validar o grupo social.");
+  }
+
+  if (!group) {
+    throw new Error("Grupo social nao encontrado para este usuario.");
+  }
+
+  const { data, error } = await supabase
+    .from("social_profiles")
+    .insert({
+      user_id: userId,
+      group_id: groupId,
+      name: profileName,
+      description: String(description || "").trim() || "Perfil social",
+      updated_at: now,
+    })
+    .select("id,user_id,group_id,name,description,created_at,updated_at")
+    .single();
+
+  if (error) {
+    logSupabaseError("salvar perfil social", error);
+    throw new Error("Nao foi possivel salvar o perfil social.");
+  }
+
+  return sanitizeProfile(data);
+}
+
 export async function saveConnectedAccount(userId, account) {
   assertSupabaseConfigured();
 

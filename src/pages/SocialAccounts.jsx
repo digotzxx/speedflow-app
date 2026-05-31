@@ -58,6 +58,12 @@ function isLocalId(id) {
   return typeof id === "string" && id.startsWith("local-");
 }
 
+function isPersistedSupabaseId(id) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(id || ""),
+  );
+}
+
 function saveLocalItem(key, item) {
   const items = readLocalItems(key).filter((currentItem) => String(currentItem.id) !== String(item.id));
   writeLocalItems(key, [item, ...items]);
@@ -161,6 +167,43 @@ async function fetchApiProfileAccountLinks() {
     console.warn("Falha ao carregar vinculos de contas dos perfis:", error);
     return [];
   }
+}
+
+async function saveApiSocialGroup(group) {
+  const response = await apiFetch("/api/social-accounts/groups", {
+    method: "POST",
+    credentials: "include",
+    body: JSON.stringify({
+      name: group.name,
+      description: group.description,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.success === false || !payload.group?.id) {
+    throw new Error(payload.message || "Nao foi possivel salvar o grupo social.");
+  }
+
+  return payload.group;
+}
+
+async function saveApiSocialProfile(profile, groupId) {
+  const response = await apiFetch("/api/social-accounts/profiles", {
+    method: "POST",
+    credentials: "include",
+    body: JSON.stringify({
+      group_id: groupId,
+      name: profile.name,
+      description: profile.description,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.success === false || !payload.profile?.id) {
+    throw new Error(payload.message || "Nao foi possivel salvar o perfil social.");
+  }
+
+  return payload.profile;
 }
 
 async function fetchSocialData() {
@@ -442,16 +485,81 @@ export default function SocialAccounts() {
     connectTikTok({ groupId, profileId });
   }
 
-  function openChooseTikTokModal(groupId, profile) {
-    const profileId = typeof profile === "object" ? profile.id : profile;
-    const profileName = typeof profile === "object" ? profile.name : "";
+  async function ensureProfilePersisted(group, profile) {
+    let updatedGroup = group;
+    let updatedProfile = profile;
 
-    if (isLocalId(profileId)) {
-      alert("Este perfil ainda esta salvo apenas neste navegador. Salve o perfil no Supabase antes de vincular uma conta TikTok.");
-      return;
+    if (!isPersistedSupabaseId(group?.id)) {
+      const savedGroup = await saveApiSocialGroup(group);
+      const oldGroupId = group.id;
+
+      updatedGroup = savedGroup;
+      removeLocalItem(LOCAL_GROUPS_KEY, oldGroupId);
+      writeLocalItems(
+        LOCAL_PROFILES_KEY,
+        readLocalItems(LOCAL_PROFILES_KEY).map((localProfile) =>
+          String(localProfile.group_id) === String(oldGroupId)
+            ? { ...localProfile, group_id: savedGroup.id }
+            : localProfile,
+        ),
+      );
+      setGroups((currentGroups) =>
+        currentGroups.map((currentGroup) =>
+          String(currentGroup.id) === String(oldGroupId) ? savedGroup : currentGroup,
+        ),
+      );
+      setProfiles((currentProfiles) =>
+        currentProfiles.map((currentProfile) =>
+          String(currentProfile.group_id) === String(oldGroupId)
+            ? { ...currentProfile, group_id: savedGroup.id }
+            : currentProfile,
+        ),
+      );
+      setSelectedGroupId((currentGroupId) =>
+        String(currentGroupId) === String(oldGroupId) ? savedGroup.id : currentGroupId,
+      );
     }
 
-    setChooseTikTokModal({ groupId: isLocalId(groupId) ? null : groupId, profileId, profileName });
+    if (!isPersistedSupabaseId(profile?.id)) {
+      const savedProfile = await saveApiSocialProfile(
+        {
+          ...profile,
+          group_id: updatedGroup.id,
+        },
+        updatedGroup.id,
+      );
+      const oldProfileId = profile.id;
+
+      updatedProfile = savedProfile;
+      removeLocalItem(LOCAL_PROFILES_KEY, oldProfileId);
+      setProfiles((currentProfiles) =>
+        currentProfiles.map((currentProfile) =>
+          String(currentProfile.id) === String(oldProfileId) ? savedProfile : currentProfile,
+        ),
+      );
+    }
+
+    return {
+      groupId: updatedGroup.id,
+      profileId: updatedProfile.id,
+      updatedGroup,
+      updatedProfile,
+    };
+  }
+
+  async function openChooseTikTokModal(group, profile) {
+    try {
+      const { groupId, profileId, updatedProfile } = await ensureProfilePersisted(group, profile);
+
+      setChooseTikTokModal({
+        groupId,
+        profileId,
+        profileName: updatedProfile.name || profile.name,
+      });
+    } catch (error) {
+      console.warn("Falha ao persistir perfil antes do TikTok:", error);
+      alert("Nao foi possivel salvar este perfil antes de conectar o TikTok. Tente novamente.");
+    }
   }
 
   function openTikTokAccountSwitcher() {
@@ -792,14 +900,14 @@ export default function SocialAccounts() {
                                 Instagram
                               </button>
 
-                              <button onClick={() => openChooseTikTokModal(group.id, profile)}>
+                              <button onClick={() => openChooseTikTokModal(group, profile)}>
                                 <Plus size={14} />
                                 TikTok
                               </button>
                             </div>
                           </div>
                         </div>
-      );
+                      );
                     })}
                     <button className="add-profile-card" onClick={() => addProfileSlot(group.id)}>
                       <Plus size={22} />

@@ -2,7 +2,9 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { handleTikTokOAuthCallback } from "./api/_tiktokOAuth.js";
 import socialAccountsHandler from "./api/social-accounts/index.js";
+import socialGroupsHandler from "./api/social-accounts/groups.js";
 import profileAccountsHandler from "./api/social-accounts/profile-accounts.js";
+import socialProfilesHandler from "./api/social-accounts/profiles.js";
 import disconnectTikTokHandler from "./api/social-accounts/tiktok/disconnect.js";
 
 function applyBackendEnv(env) {
@@ -29,7 +31,9 @@ function tiktokOAuthPlugin() {
       server.middlewares.use("/api/auth/tiktok/token", handleTikTokOAuthCallback);
       server.middlewares.use("/api/auth/tiktok/callback", handleTikTokOAuthCallback);
       server.middlewares.use("/api/social-accounts/tiktok/disconnect", disconnectTikTokHandler);
+      server.middlewares.use("/api/social-accounts/groups", socialGroupsHandler);
       server.middlewares.use("/api/social-accounts/profile-accounts", profileAccountsHandler);
+      server.middlewares.use("/api/social-accounts/profiles", socialProfilesHandler);
       server.middlewares.use("/api/social-accounts", socialAccountsHandler);
     },
   };

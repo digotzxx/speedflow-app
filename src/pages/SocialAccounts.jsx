@@ -249,6 +249,7 @@ export default function SocialAccounts() {
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [chooseTikTokModal, setChooseTikTokModal] = useState(null);
+  const [tiktokPrepareError, setTikTokPrepareError] = useState("");
 
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
@@ -548,6 +549,8 @@ export default function SocialAccounts() {
   }
 
   async function openChooseTikTokModal(group, profile) {
+    setTikTokPrepareError("");
+
     try {
       const { groupId, profileId, updatedProfile } = await ensureProfilePersisted(group, profile);
 
@@ -558,7 +561,7 @@ export default function SocialAccounts() {
       });
     } catch (error) {
       console.warn("Falha ao persistir perfil antes do TikTok:", error);
-      alert("Nao foi possivel salvar este perfil antes de conectar o TikTok. Tente novamente.");
+      setTikTokPrepareError("Nao foi possivel preparar este perfil para conectar o TikTok. Tente novamente.");
     }
   }
 
@@ -799,6 +802,12 @@ export default function SocialAccounts() {
         <span>CANAIS SOCIAIS</span>
         <strong>{totalProfiles}</strong>
       </div>
+
+      {tiktokPrepareError && (
+        <div className="tiktok-modal-tip">
+          <strong>{tiktokPrepareError}</strong>
+        </div>
+      )}
 
       <p className="channels-subtitle">Crie grupos e adicione varios perfis dentro deles.</p>
 

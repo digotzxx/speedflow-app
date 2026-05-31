@@ -2484,6 +2484,22 @@ button {
   margin-bottom: 18px;
 }
 
+.tiktok-global-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 26px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #14141d;
+  border: 1px solid rgba(139, 92, 246, 0.22);
+}
+
+.tiktok-global-section .channels-subtitle {
+  margin-bottom: 0;
+}
+
 .channel-card {
   background: #14141d;
   border: 1px solid rgba(139, 92, 246, 0.32);
@@ -3122,6 +3138,11 @@ button {
 
   .connected-account-actions {
     justify-content: flex-start;
+  }
+
+  .tiktok-global-section {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .primary-action,

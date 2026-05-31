@@ -458,11 +458,6 @@ export default function SocialAccounts() {
               Reconectar
             </button>
 
-            <button onClick={() => openAddAnotherTikTokModal(groupId, profileId)}>
-              <Plus size={13} />
-              Conectar outro perfil TikTok
-            </button>
-
             <button className="danger" onClick={() => disconnectTikTokAccount(account)}>
               <Trash2 size={13} />
               Desconectar
@@ -475,11 +470,6 @@ export default function SocialAccounts() {
             <button onClick={() => connectGroupTikTok(groupId, profileId)}>
               <RefreshCw size={13} />
               Reconectar
-            </button>
-
-            <button onClick={() => openAddAnotherTikTokModal(groupId, profileId)}>
-              <Plus size={13} />
-              Conectar outro perfil TikTok
             </button>
 
             <button className="danger" onClick={() => disconnectTikTokAccount(account)}>
@@ -495,6 +485,8 @@ export default function SocialAccounts() {
   const totalProfiles = profiles.length;
   const totalGroups = groups.length;
   const totalAccounts = accounts.length;
+  const tiktokAccounts = accounts.filter(isTikTokAccount);
+  const defaultTikTokGroupId = selectedGroupId || groups[0]?.id || 1;
 
   return (
     <div className="channels-page">
@@ -536,6 +528,23 @@ export default function SocialAccounts() {
           <strong>{totalAccounts}</strong>
           <span>Contas conectadas</span>
         </div>
+      </div>
+
+      <div className="tiktok-global-section">
+        <div>
+          <div className="channels-section-title">
+            <span>CONTAS TIKTOK</span>
+            <strong>{tiktokAccounts.length}</strong>
+          </div>
+          <p className="channels-subtitle">
+            Gerencie seus perfis TikTok conectados ou adicione outro perfil ao mesmo usuario.
+          </p>
+        </div>
+
+        <button className="primary-action" onClick={() => openAddAnotherTikTokModal(defaultTikTokGroupId)}>
+          <Plus size={16} />
+          Conectar outro perfil TikTok
+        </button>
       </div>
 
       <div className="channels-section-title">
@@ -769,8 +778,9 @@ export default function SocialAccounts() {
               <div>
                 <h2>Conectar outro perfil TikTok</h2>
                 <p>
-                  Para conectar outro perfil, saia ou troque de conta no TikTok antes de continuar.
-                  O TikTok pode usar automaticamente a conta que ja esta logada neste navegador.
+                  O TikTok pode usar automaticamente a conta já logada neste navegador. Para conectar
+                  outro perfil, abra o TikTok em uma nova aba, saia da conta atual ou troque de perfil,
+                  depois volte aqui e continue.
                 </p>
               </div>
 
@@ -783,7 +793,7 @@ export default function SocialAccounts() {
               </button>
 
               <button type="button" className="save-button" onClick={continueAddAnotherTikTok}>
-                Continuar conexao com outro perfil
+                Continuar conexão com outro perfil
               </button>
             </div>
           </div>

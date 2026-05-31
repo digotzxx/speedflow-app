@@ -302,10 +302,14 @@ export async function handleTikTokOAuthCallback(req, res) {
 
     step = "salvar conta TikTok no Supabase";
     const publicAccount = await saveConnectedAccount(userSession.id, account);
+    const message = publicAccount.was_existing
+      ? "Essa conta TikTok ja estava conectada. Atualizamos a autorizacao."
+      : "Novo perfil TikTok conectado com sucesso.";
 
     sendJson(res, 200, {
       success: true,
-      message: "TikTok conectado com sucesso.",
+      message,
+      was_existing: publicAccount.was_existing,
       account: publicAccount,
     });
   } catch (error) {

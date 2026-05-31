@@ -160,6 +160,7 @@ export default function SocialAccounts() {
 
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [addTikTokModal, setAddTikTokModal] = useState(null);
 
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
@@ -341,6 +342,9 @@ export default function SocialAccounts() {
       const response = await apiFetch("/api/social-accounts/tiktok/disconnect", {
         method: "POST",
         credentials: "include",
+        body: JSON.stringify({
+          account_id: account.account_id || account.provider_user_id || null,
+        }),
       });
       const payload = await response.json().catch(() => ({}));
 
@@ -358,16 +362,12 @@ export default function SocialAccounts() {
       readLocalItems(LOCAL_ACCOUNTS_KEY).filter(
         (currentAccount) =>
           String(currentAccount.id) !== String(account.id) &&
+          String(currentAccount.account_id || "") !== String(account.account_id || "") &&
           String(currentAccount.provider_user_id || "") !== String(account.provider_user_id || ""),
       ),
     );
 
     await loadData();
-  }
-
-  async function syncTikTokAccount() {
-    await loadData();
-    alert("Conta TikTok sincronizada.");
   }
 
   function connectGroupInstagram(groupId, profileId = null) {
@@ -376,6 +376,24 @@ export default function SocialAccounts() {
 
   function connectGroupTikTok(groupId, profileId = null) {
     connectTikTok({ groupId, profileId });
+  }
+
+  function openAddAnotherTikTokModal(groupId, profileId = null) {
+    setAddTikTokModal({ groupId, profileId });
+  }
+
+  function openTikTokAccountSwitcher() {
+    window.open("https://www.tiktok.com", "_blank", "noopener,noreferrer");
+  }
+
+  function continueAddAnotherTikTok() {
+    const context = addTikTokModal || {};
+    setAddTikTokModal(null);
+    connectTikTok({
+      groupId: context.groupId,
+      profileId: context.profileId,
+      mode: "add_another",
+    });
   }
 
   async function addProfileSlot(groupId) {
@@ -437,16 +455,31 @@ export default function SocialAccounts() {
           <div className="connected-account-actions">
             <button onClick={() => connectGroupTikTok(groupId, profileId)}>
               <Plus size={13} />
-              Conectar novamente
+              Reconectar
+            </button>
+
+            <button onClick={() => openAddAnotherTikTokModal(groupId, profileId)}>
+              <Plus size={13} />
+              Conectar outro perfil TikTok
+            </button>
+
+            <button className="danger" onClick={() => disconnectTikTokAccount(account)}>
+              <Trash2 size={13} />
+              Desconectar
             </button>
           </div>
         )}
 
         {tiktokAccount && !disconnected && (
           <div className="connected-account-actions">
-            <button onClick={() => syncTikTokAccount(account)}>
+            <button onClick={() => connectGroupTikTok(groupId, profileId)}>
               <RefreshCw size={13} />
-              Sincronizar
+              Reconectar
+            </button>
+
+            <button onClick={() => openAddAnotherTikTokModal(groupId, profileId)}>
+              <Plus size={13} />
+              Conectar outro perfil TikTok
             </button>
 
             <button className="danger" onClick={() => disconnectTikTokAccount(account)}>
@@ -725,6 +758,34 @@ export default function SocialAccounts() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {addTikTokModal && (
+        <div className="modal-bg">
+          <div className="social-modal">
+            <div className="modal-top">
+              <div>
+                <h2>Conectar outro perfil TikTok</h2>
+                <p>
+                  Para conectar outro perfil, saia ou troque de conta no TikTok antes de continuar.
+                  O TikTok pode usar automaticamente a conta que ja esta logada neste navegador.
+                </p>
+              </div>
+
+              <button onClick={() => setAddTikTokModal(null)}>x</button>
+            </div>
+
+            <div className="modal-buttons">
+              <button type="button" className="cancel-button" onClick={openTikTokAccountSwitcher}>
+                Abrir TikTok para trocar de conta
+              </button>
+
+              <button type="button" className="save-button" onClick={continueAddAnotherTikTok}>
+                Continuar conexao com outro perfil
+              </button>
+            </div>
           </div>
         </div>
       )}

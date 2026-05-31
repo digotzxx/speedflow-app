@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../lib/apiClient";
 import { supabase } from "../lib/supabase";
-import { TIKTOK_CODE_VERIFIER_KEY, TIKTOK_STATE_KEY } from "../lib/socialAuth";
+import { TIKTOK_CODE_VERIFIER_KEY, TIKTOK_MODE_KEY, TIKTOK_STATE_KEY } from "../lib/socialAuth";
 
 const LOCAL_GROUPS_KEY = "socialflow_groups";
 const LOCAL_ACCOUNTS_KEY = "socialflow_accounts";
@@ -73,7 +73,9 @@ function redirectToSocialAccounts(navigate, delay = 1500) {
 function clearTikTokSession() {
   sessionStorage.removeItem(TIKTOK_STATE_KEY);
   sessionStorage.removeItem(TIKTOK_CODE_VERIFIER_KEY);
+  sessionStorage.removeItem(TIKTOK_MODE_KEY);
   localStorage.removeItem(TIKTOK_STATE_KEY);
+  localStorage.removeItem(TIKTOK_MODE_KEY);
 }
 
 function buildLocalAccount(account, selectedGroupId, oauthProfileId) {
@@ -149,6 +151,10 @@ export default function TikTokCallback() {
         const expectedState =
           sessionStorage.getItem(TIKTOK_STATE_KEY) || localStorage.getItem(TIKTOK_STATE_KEY);
         const codeVerifier = sessionStorage.getItem(TIKTOK_CODE_VERIFIER_KEY);
+        const oauthMode =
+          sessionStorage.getItem(TIKTOK_MODE_KEY) ||
+          localStorage.getItem(TIKTOK_MODE_KEY) ||
+          (expectedState?.startsWith("add_another.") ? "add_another" : "connect");
 
         if (!expectedState || expectedState !== state) {
           setStatus("Falha na conexao com TikTok");
@@ -191,8 +197,16 @@ export default function TikTokCallback() {
         writeLocalList(LOCAL_GROUPS_KEY, groups);
         writeLocalList(LOCAL_ACCOUNTS_KEY, [account, ...accountsWithoutDuplicate]);
 
-        setStatus("TikTok conectado com sucesso!");
-        setMessage("Sua conta foi salva. Redirecionando para Contas Sociais...");
+        const successMessage = payload.was_existing
+          ? "Conta TikTok reconectada com sucesso."
+          : "Novo perfil TikTok conectado com sucesso.";
+
+        setStatus(successMessage);
+        setMessage(
+          oauthMode === "add_another"
+            ? `${successMessage} Redirecionando para Contas Sociais...`
+            : `${successMessage} Redirecionando para Contas Sociais...`,
+        );
         redirectToSocialAccounts(navigate, 1200);
       } catch (callbackError) {
         console.error("TikTok callback error:", callbackError);

@@ -11,6 +11,7 @@ export const TIKTOK_SCOPE = "user.info.basic,video.list,video.upload";
 export const TIKTOK_AUTH_URL = "https://www.tiktok.com/v2/auth/authorize/";
 export const TIKTOK_STATE_KEY = "tiktok_oauth_state";
 export const TIKTOK_CODE_VERIFIER_KEY = "tiktok_code_verifier";
+export const TIKTOK_MODE_KEY = "tiktok_oauth_mode";
 
 function base64UrlEncode(value) {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
@@ -108,12 +109,15 @@ export async function connectTikTok(context = {}) {
     return;
   }
 
-  const csrfState = crypto.randomUUID();
+  const mode = context.mode === "add_another" ? "add_another" : "connect";
+  const csrfState = `${mode}.${crypto.randomUUID()}`;
   const { codeVerifier, codeChallenge } = await createTikTokPkcePair();
 
   localStorage.removeItem(TIKTOK_STATE_KEY);
+  localStorage.removeItem(TIKTOK_MODE_KEY);
   sessionStorage.setItem(TIKTOK_STATE_KEY, csrfState);
   sessionStorage.setItem(TIKTOK_CODE_VERIFIER_KEY, codeVerifier);
+  sessionStorage.setItem(TIKTOK_MODE_KEY, mode);
   saveOAuthContext("tiktok", context);
 
   window.location.href = buildTikTokAuthorizationUrl(csrfState, codeChallenge);

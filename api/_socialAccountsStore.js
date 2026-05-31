@@ -104,6 +104,21 @@ export async function saveConnectedAccount(userId, account) {
   }
 
   const supabase = getSupabaseAdmin();
+  let wasExisting = false;
+  const { data: existingAccount, error: existingError } = await supabase
+    .from("social_accounts")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("provider", account.provider || "tiktok")
+    .eq("account_id", accountId)
+    .maybeSingle();
+
+  if (existingError) {
+    logSupabaseError("verificar conta conectada existente", existingError);
+  } else {
+    wasExisting = Boolean(existingAccount);
+  }
+
   const { data, error } = await supabase
     .from("social_accounts")
     .upsert(buildAccountRow({ userId, account }), {
@@ -119,7 +134,10 @@ export async function saveConnectedAccount(userId, account) {
     throw new Error("Conta TikTok autorizada, mas houve erro ao salvar no banco.");
   }
 
-  return sanitizeAccount(data);
+  return {
+    ...sanitizeAccount(data),
+    was_existing: wasExisting,
+  };
 }
 
 export async function listConnectedAccounts(userId) {
@@ -142,12 +160,12 @@ export async function listConnectedAccounts(userId) {
   return (data || []).map(sanitizeAccount);
 }
 
-export async function disconnectProvider(userId, provider) {
+export async function disconnectProvider(userId, provider, accountId = null) {
   assertSupabaseConfigured();
 
   const now = new Date().toISOString();
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase
+  let query = supabase
     .from("social_accounts")
     .update({
       status: "disconnected",
@@ -158,6 +176,12 @@ export async function disconnectProvider(userId, provider) {
     })
     .eq("user_id", userId)
     .eq("provider", provider);
+
+  if (accountId) {
+    query = query.eq("account_id", accountId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     logSupabaseError("desconectar conta", error);

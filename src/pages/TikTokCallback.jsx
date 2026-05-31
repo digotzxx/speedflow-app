@@ -198,7 +198,8 @@ export default function TikTokCallback() {
         writeLocalList(LOCAL_ACCOUNTS_KEY, [account, ...accountsWithoutDuplicate]);
 
         const successMessage = payload.was_existing
-          ? "Conta TikTok reconectada com sucesso."
+          ? payload.message ||
+            "Essa mesma conta TikTok ja estava conectada. Para adicionar outro perfil, saia dessa conta no TikTok ou use uma janela anonima."
           : "Novo perfil TikTok conectado com sucesso.";
 
         setStatus(successMessage);

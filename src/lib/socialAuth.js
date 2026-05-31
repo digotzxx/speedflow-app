@@ -74,6 +74,10 @@ export function buildTikTokAuthorizationUrl(state, codeChallenge) {
   return `${TIKTOK_AUTH_URL}?${params.toString()}`;
 }
 
+export function getTikTokAddAnotherStartUrl() {
+  return `${APP_URL}/contas-sociais?start_tiktok=add_another`;
+}
+
 export async function connectInstagram(context = {}) {
   if (!INSTAGRAM_CLIENT_ID) {
     alert("Falta configurar VITE_INSTAGRAM_CLIENT_ID no arquivo .env");
@@ -121,4 +125,8 @@ export async function connectTikTok(context = {}) {
   saveOAuthContext("tiktok", context);
 
   window.location.href = buildTikTokAuthorizationUrl(csrfState, codeChallenge);
+}
+
+export async function startTikTokAuth(context = {}) {
+  return connectTikTok(context);
 }

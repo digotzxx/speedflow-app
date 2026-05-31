@@ -38,7 +38,10 @@ function Login() {
   const [message, setMessage] = useState("");
   const [canResendConfirmation, setCanResendConfirmation] = useState(false);
 
-  const redirectTo = location.state?.from?.pathname || "/dashboard";
+  const redirectFrom = location.state?.from;
+  const redirectTo = redirectFrom
+    ? `${redirectFrom.pathname || "/dashboard"}${redirectFrom.search || ""}`
+    : "/dashboard";
 
   useEffect(() => {
     if (user) {

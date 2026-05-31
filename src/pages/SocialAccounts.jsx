@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Plus,
   FolderPlus,
@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { apiFetch } from "../lib/apiClient";
-import { connectInstagram, connectTikTok } from "../lib/socialAuth";
+import { connectInstagram, connectTikTok, getTikTokAddAnotherStartUrl } from "../lib/socialAuth";
 
 const LOCAL_GROUPS_KEY = "socialflow_groups";
 const LOCAL_PROFILES_KEY = "socialflow_profiles";
@@ -154,6 +154,7 @@ async function fetchSocialData() {
 }
 
 export default function SocialAccounts() {
+  const autoStartTikTokRef = useRef(false);
   const [groups, setGroups] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -210,6 +211,24 @@ export default function SocialAccounts() {
       active = false;
     };
   }, [applyLoadedData]);
+
+  useEffect(() => {
+    if (autoStartTikTokRef.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("start_tiktok") !== "add_another") return;
+
+    autoStartTikTokRef.current = true;
+    params.delete("start_tiktok");
+    const nextSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
+    window.history.replaceState({}, "", nextUrl);
+
+    connectTikTok({
+      groupId: selectedGroupId || groups[0]?.id || 1,
+      mode: "add_another",
+    });
+  }, [groups, selectedGroupId]);
 
   async function createGroup(e) {
     e.preventDefault();
@@ -384,6 +403,18 @@ export default function SocialAccounts() {
 
   function openTikTokAccountSwitcher() {
     window.open("https://www.tiktok.com", "_blank", "noopener,noreferrer");
+  }
+
+  async function copyTikTokIncognitoLink() {
+    const link = getTikTokAddAnotherStartUrl();
+
+    try {
+      await navigator.clipboard.writeText(link);
+      alert("Link copiado. Abra uma janela anonima, cole o link e entre na outra conta TikTok.");
+    } catch (error) {
+      console.warn("Falha ao copiar link TikTok:", error);
+      window.prompt("Copie este link e abra em uma janela anonima:", link);
+    }
   }
 
   function continueAddAnotherTikTok() {
@@ -778,22 +809,31 @@ export default function SocialAccounts() {
               <div>
                 <h2>Conectar outro perfil TikTok</h2>
                 <p>
-                  O TikTok pode usar automaticamente a conta já logada neste navegador. Para conectar
-                  outro perfil, abra o TikTok em uma nova aba, saia da conta atual ou troque de perfil,
-                  depois volte aqui e continue.
+                  O TikTok está usando a conta que já está logada neste navegador. Para conectar outro
+                  perfil, você precisa sair da conta TikTok atual ou usar uma janela anônima/outro
+                  navegador.
                 </p>
               </div>
 
               <button onClick={() => setAddTikTokModal(null)}>x</button>
             </div>
 
+            <p className="tiktok-modal-tip">
+              Melhor opção: copie o link, abra uma janela anônima, cole o link e entre na outra conta
+              TikTok.
+            </p>
+
             <div className="modal-buttons">
               <button type="button" className="cancel-button" onClick={openTikTokAccountSwitcher}>
-                Abrir TikTok para trocar de conta
+                Abrir TikTok para sair/trocar conta
+              </button>
+
+              <button type="button" className="cancel-button" onClick={copyTikTokIncognitoLink}>
+                Copiar link para abrir em janela anônima
               </button>
 
               <button type="button" className="save-button" onClick={continueAddAnotherTikTok}>
-                Continuar conexão com outro perfil
+                Continuar conexão
               </button>
             </div>
           </div>

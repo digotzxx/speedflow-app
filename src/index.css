@@ -2500,6 +2500,20 @@ button {
   margin-bottom: 0;
 }
 
+.tiktok-modal-tip {
+  margin: 0 0 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.12);
+  color: #ddd6fe;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.social-modal .modal-buttons {
+  flex-wrap: wrap;
+}
+
 .channel-card {
   background: #14141d;
   border: 1px solid rgba(139, 92, 246, 0.32);

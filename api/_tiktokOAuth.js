@@ -1,4 +1,5 @@
 import {
+  linkAccountToProfile,
   saveConnectedAccount,
   sendJson,
   sendNoContent,
@@ -9,6 +10,26 @@ const TIKTOK_TOKEN_ENDPOINT = "https://open.tiktokapis.com/v2/oauth/token/";
 const TIKTOK_USER_INFO_ENDPOINT = "https://open.tiktokapis.com/v2/user/info/";
 const CODE_VERIFIER_PATTERN = /^[A-Za-z0-9\-._~]{43,128}$/;
 const USER_INFO_FIELDS = "open_id,union_id,avatar_url,display_name";
+
+function parseOAuthState(state) {
+  if (!state || typeof state !== "string") return null;
+
+  if (state.startsWith("add_another.") || state.startsWith("connect.")) {
+    const [mode, nonce] = state.split(".");
+
+    return { mode, nonce };
+  }
+
+  try {
+    const normalized = state.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const json = Buffer.from(padded, "base64").toString("utf8");
+
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
 
 function mask(value) {
   if (!value) return null;
@@ -211,8 +232,12 @@ export async function handleTikTokOAuthCallback(req, res) {
     step = "ler corpo da requisicao";
     const body = await parseBody(req);
     const code = typeof body.code === "string" ? body.code.trim() : "";
+    const state = typeof body.state === "string" ? body.state.trim() : "";
     const codeVerifier = typeof body.code_verifier === "string" ? body.code_verifier.trim() : "";
     const scopes = typeof body.scopes === "string" ? body.scopes : "";
+    const parsedState = parseOAuthState(state);
+    const groupId = body.group_id || body.groupId || parsedState?.groupId || null;
+    const profileId = body.profile_id || body.profileId || parsedState?.profileId || null;
     const config = getTikTokConfig();
     const missingConfig = validateConfig(config);
 
@@ -303,10 +328,30 @@ export async function handleTikTokOAuthCallback(req, res) {
     step = "salvar conta TikTok no Supabase";
     const publicAccount = await saveConnectedAccount(userSession.id, account);
     const wasExisting = publicAccount.action === "updated";
-    const title = wasExisting
+    let profileLink = null;
+
+    if (profileId) {
+      step = "vincular conta TikTok ao perfil";
+      profileLink = await linkAccountToProfile(userSession.id, {
+        groupId,
+        profileId,
+        socialAccountId: publicAccount.id,
+        provider: "tiktok",
+      });
+    }
+
+    const title = profileId
+      ? wasExisting
+        ? "Essa conta TikTok ja estava salva e foi vinculada a este perfil"
+        : "Nova conta TikTok conectada e vinculada ao perfil com sucesso"
+      : wasExisting
       ? "Essa conta TikTok ja estava conectada"
       : "Nova conta TikTok conectada com sucesso";
-    const message = wasExisting
+    const message = profileId
+      ? wasExisting
+        ? "Essa conta TikTok ja estava salva e foi vinculada a este perfil."
+        : "Nova conta TikTok conectada e vinculada ao perfil com sucesso."
+      : wasExisting
       ? "O TikTok retornou o mesmo perfil ja salvo. Para adicionar outra conta, use janela anonima, outro navegador ou outro perfil do Chrome."
       : "Esse perfil foi salvo como uma nova conta TikTok no SpeedFlow.";
 
@@ -319,6 +364,7 @@ export async function handleTikTokOAuthCallback(req, res) {
       account_id: publicAccount.account_id,
       provider: "tiktok",
       was_existing: wasExisting,
+      profile_link: profileLink,
       account: publicAccount,
     });
   } catch (error) {

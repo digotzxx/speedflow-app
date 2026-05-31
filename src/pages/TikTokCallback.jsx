@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../lib/apiClient";
 import { supabase } from "../lib/supabase";
-import { TIKTOK_CODE_VERIFIER_KEY, TIKTOK_MODE_KEY, TIKTOK_STATE_KEY } from "../lib/socialAuth";
+import {
+  parseTikTokOAuthState,
+  TIKTOK_CODE_VERIFIER_KEY,
+  TIKTOK_MODE_KEY,
+  TIKTOK_STATE_KEY,
+} from "../lib/socialAuth";
 
 const LOCAL_GROUPS_KEY = "socialflow_groups";
 const LOCAL_ACCOUNTS_KEY = "socialflow_accounts";
@@ -41,7 +46,7 @@ async function readApiResponse(response) {
   }
 }
 
-async function exchangeTikTokCode({ code, state, scopes, codeVerifier }) {
+async function exchangeTikTokCode({ code, state, scopes, codeVerifier, groupId, profileId }) {
   const response = await apiFetch("/api/auth/tiktok/callback", {
     method: "POST",
     credentials: "include",
@@ -50,6 +55,8 @@ async function exchangeTikTokCode({ code, state, scopes, codeVerifier }) {
       state,
       scopes,
       code_verifier: codeVerifier,
+      group_id: groupId || null,
+      profile_id: profileId || null,
     }),
   });
   const payload = await readApiResponse(response);
@@ -75,6 +82,7 @@ function clearTikTokSession() {
   sessionStorage.removeItem(TIKTOK_CODE_VERIFIER_KEY);
   sessionStorage.removeItem(TIKTOK_MODE_KEY);
   localStorage.removeItem(TIKTOK_STATE_KEY);
+  localStorage.removeItem(TIKTOK_CODE_VERIFIER_KEY);
   localStorage.removeItem(TIKTOK_MODE_KEY);
 }
 
@@ -150,8 +158,11 @@ export default function TikTokCallback() {
 
         const expectedState =
           sessionStorage.getItem(TIKTOK_STATE_KEY) || localStorage.getItem(TIKTOK_STATE_KEY);
-        const codeVerifier = sessionStorage.getItem(TIKTOK_CODE_VERIFIER_KEY);
+        const parsedState = parseTikTokOAuthState(state);
+        const codeVerifier =
+          sessionStorage.getItem(TIKTOK_CODE_VERIFIER_KEY) || localStorage.getItem(TIKTOK_CODE_VERIFIER_KEY);
         const oauthMode =
+          parsedState?.mode ||
           sessionStorage.getItem(TIKTOK_MODE_KEY) ||
           localStorage.getItem(TIKTOK_MODE_KEY) ||
           (expectedState?.startsWith("add_another.") ? "add_another" : "connect");
@@ -172,21 +183,30 @@ export default function TikTokCallback() {
 
         setStatus("Conectando TikTok...");
         setMessage("Trocando codigo de autorizacao pelo access token.");
-        const payload = await exchangeTikTokCode({ code, state, scopes, codeVerifier });
+        const oauthGroupId = takeOAuthStorageValue("tiktok_oauth_group_id");
+        const oauthProfileId = takeOAuthStorageValue("tiktok_oauth_profile_id");
+        const selectedProfileId = parsedState?.profileId || oauthProfileId || null;
+        const selectedGroupIdFromState = parsedState?.groupId || oauthGroupId || null;
+        const payload = await exchangeTikTokCode({
+          code,
+          state,
+          scopes,
+          codeVerifier,
+          groupId: selectedGroupIdFromState,
+          profileId: selectedProfileId,
+        });
         clearTikTokSession();
 
         const existingGroups = readLocalList(LOCAL_GROUPS_KEY);
         const existingAccounts = readLocalList(LOCAL_ACCOUNTS_KEY);
-        const oauthGroupId = takeOAuthStorageValue("tiktok_oauth_group_id");
-        const oauthProfileId = takeOAuthStorageValue("tiktok_oauth_profile_id");
         const defaultGroup = {
           id: 1,
           name: "Grupo Principal",
           description: "Contas principais do negocio",
         };
         const groups = existingGroups.length > 0 ? existingGroups : [defaultGroup];
-        const selectedGroupId = oauthGroupId || groups[0].id;
-        const account = buildLocalAccount(payload.account || {}, selectedGroupId, oauthProfileId);
+        const selectedGroupId = selectedGroupIdFromState || groups[0].id;
+        const account = buildLocalAccount(payload.account || {}, selectedGroupId, selectedProfileId);
         const accountsWithoutDuplicate = existingAccounts.filter(
           (currentAccount) =>
             String(currentAccount.account_id || "") !== String(account.account_id || "") &&

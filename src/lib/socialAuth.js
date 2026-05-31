@@ -30,6 +30,34 @@ function createCodeVerifier() {
   return base64UrlEncode(randomValues);
 }
 
+function encodeOAuthState(payload) {
+  const json = JSON.stringify(payload);
+  const bytes = new TextEncoder().encode(json);
+
+  return base64UrlEncode(bytes);
+}
+
+export function parseTikTokOAuthState(state) {
+  if (!state) return null;
+
+  if (state.startsWith("add_another.") || state.startsWith("connect.")) {
+    const [mode, nonce] = state.split(".");
+
+    return { mode, nonce };
+  }
+
+  try {
+    const normalized = state.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return null;
+  }
+}
+
 async function createCodeChallenge(codeVerifier) {
   const encoder = new TextEncoder();
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(codeVerifier));
@@ -106,15 +134,29 @@ export async function connectTikTok(context = {}) {
     return;
   }
 
+  const authWindow = context.openInNewWindow
+    ? window.open("about:blank", "_blank", "width=520,height=720")
+    : null;
+
+  if (authWindow) {
+    authWindow.opener = null;
+  }
+
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) {
+    authWindow?.close();
     alert("Entre na sua conta antes de conectar o TikTok.");
     window.location.href = "/login";
     return;
   }
 
   const mode = context.mode === "add_another" ? "add_another" : "connect";
-  const csrfState = `${mode}.${crypto.randomUUID()}`;
+  const csrfState = encodeOAuthState({
+    mode,
+    groupId: context.groupId || null,
+    profileId: context.profileId || null,
+    nonce: crypto.randomUUID(),
+  });
   const { codeVerifier, codeChallenge } = await createTikTokPkcePair();
 
   localStorage.removeItem(TIKTOK_STATE_KEY);
@@ -122,9 +164,19 @@ export async function connectTikTok(context = {}) {
   sessionStorage.setItem(TIKTOK_STATE_KEY, csrfState);
   sessionStorage.setItem(TIKTOK_CODE_VERIFIER_KEY, codeVerifier);
   sessionStorage.setItem(TIKTOK_MODE_KEY, mode);
+  localStorage.setItem(TIKTOK_STATE_KEY, csrfState);
+  localStorage.setItem(TIKTOK_CODE_VERIFIER_KEY, codeVerifier);
+  localStorage.setItem(TIKTOK_MODE_KEY, mode);
   saveOAuthContext("tiktok", context);
 
-  window.location.href = buildTikTokAuthorizationUrl(csrfState, codeChallenge);
+  const oauthUrl = buildTikTokAuthorizationUrl(csrfState, codeChallenge);
+
+  if (authWindow) {
+    authWindow.location.href = oauthUrl;
+    return;
+  }
+
+  window.location.href = oauthUrl;
 }
 
 export async function startTikTokAuth(context = {}) {

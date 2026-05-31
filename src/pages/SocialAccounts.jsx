@@ -12,7 +12,12 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { apiFetch } from "../lib/apiClient";
-import { connectInstagram, connectTikTok, getTikTokAddAnotherStartUrl } from "../lib/socialAuth";
+import {
+  connectInstagram,
+  connectTikTok,
+  getTikTokAddAnotherStartUrl,
+  startTikTokAuth,
+} from "../lib/socialAuth";
 
 const LOCAL_GROUPS_KEY = "socialflow_groups";
 const LOCAL_PROFILES_KEY = "socialflow_profiles";
@@ -503,11 +508,17 @@ export default function SocialAccounts() {
     });
   }
 
-  function openAddTikTokFromChooser() {
+  function openTikTokOAuthForProfile() {
     if (!chooseTikTokModal) return;
 
-    openAddAnotherTikTokModal(chooseTikTokModal.groupId, chooseTikTokModal.profileId);
+    const context = chooseTikTokModal;
     setChooseTikTokModal(null);
+    startTikTokAuth({
+      mode: "add_another",
+      groupId: context.groupId,
+      profileId: context.profileId,
+      openInNewWindow: true,
+    });
   }
 
   async function linkTikTokToProfile(account) {
@@ -1054,14 +1065,18 @@ export default function SocialAccounts() {
           <div className="social-modal">
             <div className="modal-top">
               <div>
-                <h2>Escolher conta TikTok para este perfil</h2>
+                <h2>Adicionar TikTok ao perfil</h2>
                 <p>
-                  Use uma conta TikTok ja salva no SpeedFlow. Esta acao apenas vincula a conta ao
-                  perfil, sem abrir OAuth ou reconectar no TikTok.
+                  Escolha uma conta ja salva ou abra a autorizacao oficial do TikTok para conectar
+                  outra conta.
                 </p>
               </div>
 
               <button onClick={() => setChooseTikTokModal(null)}>x</button>
+            </div>
+
+            <div className="tiktok-modal-tip">
+              <strong>Usar conta ja salva</strong>
             </div>
 
             {tiktokAccounts.length === 0 ? (
@@ -1106,7 +1121,7 @@ export default function SocialAccounts() {
                           disabled={alreadyLinked || isDisconnected(account)}
                           onClick={() => linkTikTokToProfile(account)}
                         >
-                          {alreadyLinked ? "Ja esta neste perfil" : "Usar neste perfil"}
+                          {alreadyLinked ? "Ja esta neste perfil" : "Usar esta conta neste perfil"}
                         </button>
                       </div>
                     </div>
@@ -1115,9 +1130,25 @@ export default function SocialAccounts() {
               </div>
             )}
 
+            <div className="tiktok-modal-tip">
+              <strong>Conectar nova conta TikTok</strong>
+              <p>
+                Para conectar uma conta diferente, vamos abrir a tela oficial do TikTok. Se o TikTok
+                entrar automaticamente na mesma conta, saia/troque de conta no TikTok e tente novamente.
+              </p>
+              <p>
+                Para garantir outra conta, abra o TikTok, saia da conta atual ou troque de perfil,
+                depois clique em Abrir conexao TikTok.
+              </p>
+            </div>
+
             <div className="modal-buttons">
-              <button type="button" className="save-button" onClick={openAddTikTokFromChooser}>
-                {tiktokAccounts.length === 0 ? "Adicionar nova conta TikTok" : "Adicionar outra conta TikTok"}
+              <button type="button" className="save-button" onClick={openTikTokOAuthForProfile}>
+                Abrir conexao TikTok
+              </button>
+
+              <button type="button" className="cancel-button" onClick={openTikTokAccountSwitcher}>
+                Abrir TikTok para trocar/sair da conta
               </button>
 
               <button type="button" className="cancel-button" onClick={() => setChooseTikTokModal(null)}>

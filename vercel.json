@@ -9,7 +9,7 @@
       "destination": "/index.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!terms.html|privacy.html|tiktok).*)",
       "destination": "/index.html"
     }
   ]

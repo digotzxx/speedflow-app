@@ -77,13 +77,16 @@ function clearTikTokSession() {
 }
 
 function buildLocalAccount(account, selectedGroupId, oauthProfileId) {
+  const accountId = account.account_id || account.provider_user_id;
+
   return {
-    id: account.id || `tiktok-${account.provider_user_id || Date.now()}`,
+    id: account.id || `tiktok-${accountId || Date.now()}`,
     platform: "TikTok Business",
     provider: "tiktok",
-    provider_user_id: account.provider_user_id,
+    account_id: accountId,
+    provider_user_id: account.provider_user_id || accountId,
     display_name: account.display_name,
-    username: account.display_name || "@tiktok_conectado",
+    username: account.username || account.display_name || "@tiktok_conectado",
     avatar_url: account.avatar_url || "",
     status: "Conectado",
     connection_status: account.status || "connected",
@@ -180,6 +183,7 @@ export default function TikTokCallback() {
         const account = buildLocalAccount(payload.account || {}, selectedGroupId, oauthProfileId);
         const accountsWithoutDuplicate = existingAccounts.filter(
           (currentAccount) =>
+            String(currentAccount.account_id || "") !== String(account.account_id || "") &&
             String(currentAccount.provider_user_id || "") !== String(account.provider_user_id || "") &&
             String(currentAccount.id) !== String(account.id),
         );

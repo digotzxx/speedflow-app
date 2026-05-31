@@ -54,7 +54,33 @@ async function saveAccountToSupabase(account) {
   }
 
   try {
-    await supabase.from("social_accounts").upsert(account);
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id;
+
+    if (!userId) return;
+
+    const provider = account.oauth_provider || "instagram";
+    const accountId = String(account.account_id || account.provider_user_id || account.id);
+    const now = new Date().toISOString();
+
+    await supabase.from("social_accounts").upsert(
+      {
+        user_id: userId,
+        provider,
+        platform: provider,
+        account_id: accountId,
+        provider_user_id: account.provider_user_id || accountId,
+        username: account.username || null,
+        display_name: account.display_name || account.username || null,
+        avatar_url: account.avatar_url || null,
+        status: account.status === "Conectado" ? "connected" : account.status || "connected",
+        connected_at: now,
+        disconnected_at: null,
+        raw_data: account,
+        updated_at: now,
+      },
+      { onConflict: "user_id,provider,account_id" },
+    );
   } catch (error) {
     console.warn("Falha ao salvar conta na Supabase:", error);
   }

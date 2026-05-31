@@ -78,12 +78,13 @@ function isTikTokAccount(account) {
 
 function normalizeApiAccount(account, fallbackGroupId) {
   return {
-    id: account.id || `${account.provider}-${account.provider_user_id}`,
+    id: account.id || `${account.provider}-${account.account_id || account.provider_user_id}`,
     platform: account.provider === "tiktok" ? "TikTok Business" : account.provider,
     provider: account.provider,
-    provider_user_id: account.provider_user_id,
+    account_id: account.account_id || account.provider_user_id,
+    provider_user_id: account.provider_user_id || account.account_id,
     display_name: account.display_name,
-    username: account.display_name || account.provider,
+    username: account.username || account.display_name || account.provider,
     avatar_url: account.avatar_url || "",
     status: account.status === "connected" ? "Conectado" : account.status || "Conectado",
     connection_status: account.status,

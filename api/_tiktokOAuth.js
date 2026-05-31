@@ -165,8 +165,11 @@ function buildConnectedAccount({ tokenData, user, scopes }) {
   return {
     id: `tiktok-${user.open_id || tokenData.open_id || now}`,
     provider: "tiktok",
+    platform: "tiktok",
+    account_id: user.open_id || tokenData.open_id || "",
     provider_user_id: user.open_id || tokenData.open_id || "",
     union_id: user.union_id || tokenData.union_id || null,
+    username: user.display_name || user.open_id || tokenData.open_id || "TikTok conectado",
     display_name: user.display_name || "TikTok conectado",
     avatar_url: user.avatar_url || "",
     access_token: tokenData.access_token,
@@ -177,6 +180,17 @@ function buildConnectedAccount({ tokenData, user, scopes }) {
     connected_at: new Date(now).toISOString(),
     status: "connected",
     raw_profile: user,
+    raw_data: {
+      token: {
+        open_id: tokenData.open_id || null,
+        union_id: tokenData.union_id || null,
+        expires_in: tokenData.expires_in || null,
+        refresh_expires_in: tokenData.refresh_expires_in || null,
+        scope: tokenData.scope || tokenData.scopes || null,
+        token_type: tokenData.token_type || null,
+      },
+      user,
+    },
   };
 }
 
@@ -191,7 +205,10 @@ export async function handleTikTokOAuthCallback(req, res) {
     return;
   }
 
+  let step = "iniciar callback";
+
   try {
+    step = "ler corpo da requisicao";
     const body = await parseBody(req);
     const code = typeof body.code === "string" ? body.code.trim() : "";
     const codeVerifier = typeof body.code_verifier === "string" ? body.code_verifier.trim() : "";
@@ -225,6 +242,7 @@ export async function handleTikTokOAuthCallback(req, res) {
       return;
     }
 
+    step = "validar usuario autenticado";
     const userSession = await requireUser(req, res);
     if (!userSession) return;
 
@@ -237,6 +255,7 @@ export async function handleTikTokOAuthCallback(req, res) {
       return;
     }
 
+    step = "trocar codigo por token";
     const tokenResult = await exchangeCodeForToken({ code, codeVerifier, config });
 
     if (!tokenResult.ok) {
@@ -263,6 +282,7 @@ export async function handleTikTokOAuthCallback(req, res) {
       return;
     }
 
+    step = "buscar perfil TikTok";
     const userResult = await fetchTikTokUserInfo(tokenData.access_token);
 
     if (!userResult.ok) {
@@ -280,6 +300,7 @@ export async function handleTikTokOAuthCallback(req, res) {
     const user = userResult.data?.data?.user || {};
     const account = buildConnectedAccount({ tokenData, user, scopes });
 
+    step = "salvar conta TikTok no Supabase";
     const publicAccount = await saveConnectedAccount(userSession.id, account);
 
     sendJson(res, 200, {
@@ -288,6 +309,12 @@ export async function handleTikTokOAuthCallback(req, res) {
       account: publicAccount,
     });
   } catch (error) {
+    console.error("[TikTok OAuth] callback falhou:", {
+      step,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
     sendJson(res, 500, {
       success: false,
       message: error instanceof Error ? error.message : "Falha ao concluir OAuth do TikTok.",

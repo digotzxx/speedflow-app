@@ -29,11 +29,19 @@
       "destination": "/tiktokNzuROVg7xPbbKjTMr9t6KvLt77MS6F5w.txt"
     },
     {
+      "source": "/terms/tiktokNzuROVg7xPbbKjTMr9t6KvLt77MS6F5w.txt/",
+      "destination": "/terms/tiktokNzuROVg7xPbbKjTMr9t6KvLt77MS6F5w.txt"
+    },
+    {
+      "source": "/privacy/tiktokNzuROVg7xPbbKjTMr9t6KvLt77MS6F5w.txt/",
+      "destination": "/privacy/tiktokNzuROVg7xPbbKjTMr9t6KvLt77MS6F5w.txt"
+    },
+    {
       "source": "/auth/callback/tiktok",
       "destination": "/index.html"
     },
     {
-      "source": "/((?!terms.html|privacy.html|tiktok).*)",
+      "source": "/((?!terms.html|privacy.html|terms|privacy|tiktok).*)",
       "destination": "/index.html"
     }
   ]
